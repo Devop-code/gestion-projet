@@ -1,4 +1,4 @@
-
+"use client"
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,21 +16,14 @@ export const LoginForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password}),
+      });
 
-    const { error } = await signIn(email, password);
     
-    if (error) {
-      toast({
-        title: "Erreur de connexion",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Connexion réussie",
-        description: "Vous êtes maintenant connecté.",
-      });
-    }
+   
     
     setLoading(false);
   };

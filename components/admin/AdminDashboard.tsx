@@ -118,7 +118,7 @@ export const AdminDashboard = () => {
         <CardHeader>
           <CardTitle>Projets</CardTitle>
           <CardDescription>
-            Gérez tous les projets de l'université
+            Gérez tous les projets de l université
           </CardDescription>
         </CardHeader>
         <CardContent>

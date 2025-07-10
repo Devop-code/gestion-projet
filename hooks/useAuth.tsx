@@ -43,7 +43,7 @@ export const useAuth = () => {
     console.log('Sign out');
     return { error: null };
   };
-
+                          
   return {
     user,
     profile,

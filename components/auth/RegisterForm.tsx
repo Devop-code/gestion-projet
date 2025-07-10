@@ -1,11 +1,10 @@
-
+"use client"
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
 interface RegisterFormProps {
@@ -19,27 +18,41 @@ export const RegisterForm = ({ onBackToLogin }: RegisterFormProps) => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'student' | 'supervisor'>('student');
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signUp(email, password, firstName, lastName, role);
-    
-    if (error) {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, firstName, lastName, role }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({
+          title: "Erreur d'inscription",
+          description: data.error || 'Erreur inconnue',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: "Inscription réussie",
+          description: "Votre compte a été créé avec succès.",
+        });
+      }
+    } catch (error: unknown) {
+      let message = 'Erreur inconnue';
+      if (error && typeof error === 'object' && 'message' in error) {
+        message = (error as { message: string }).message;
+      }
       toast({
         title: "Erreur d'inscription",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Inscription réussie",
-        description: "Votre compte a été créé avec succès.",
+        description: message,
+        variant: 'destructive',
       });
     }
-    
     setLoading(false);
   };
 
@@ -48,7 +61,7 @@ export const RegisterForm = ({ onBackToLogin }: RegisterFormProps) => {
       <CardHeader>
         <CardTitle>Créer un compte</CardTitle>
         <CardDescription>
-          Inscrivez-vous pour accéder à l'application
+          Inscrivez-vous pour accéder à l application
         </CardDescription>
       </CardHeader>
       <CardContent>

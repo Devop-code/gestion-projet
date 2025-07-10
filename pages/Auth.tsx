@@ -1,4 +1,4 @@
-
+"use client"
 import { useState } from 'react';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
@@ -30,7 +30,7 @@ export const Auth = () => {
                 onClick={() => setShowRegister(true)}
                 className="font-medium text-indigo-600 hover:text-indigo-500"
               >
-                S'inscrire
+                S inscrire
               </button>
             </>
           )}
