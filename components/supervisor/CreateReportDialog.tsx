@@ -51,12 +51,20 @@ export const CreateReportDialog = ({ open, onOpenChange }: CreateReportDialogPro
         body: JSON.stringify({
           title,
           content,
+          type,
           project_id: project,
           author_id: student,
           session_date: new Date().toISOString(),
         }),
       });
-      if (!res.ok) throw new Error('Erreur lors de la création');
+      if (!res.ok) {
+        let msg = 'Erreur lors de la création';
+        try {
+          const data = await res.json();
+          if (data && data.error) msg = data.error;
+        } catch {}
+        throw new Error(msg);
+      }
       toast({
         title: 'Rapport créé',
         description: 'Le rapport a été créé avec succès.',
@@ -71,7 +79,7 @@ export const CreateReportDialog = ({ open, onOpenChange }: CreateReportDialogPro
     } catch (error) {
       toast({
         title: 'Erreur',
-        description: 'Impossible de créer le rapport',
+        description: error instanceof Error ? error.message : 'Impossible de créer le rapport',
         variant: 'destructive',
       });
       setLoading(false);

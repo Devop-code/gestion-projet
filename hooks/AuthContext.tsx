@@ -1,4 +1,5 @@
 "use client"
+import { useRouter } from 'next/navigation';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export type UserRole = 'admin' | 'student' | 'supervisor';
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter()
 
   useEffect(() => {
     const stored = localStorage.getItem('auth_user');
@@ -46,6 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(data.user);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
         setLoading(false);
+        router.push(`/${data.user.role}`)
         return { error: null };
       } else {
         setLoading(false);
@@ -55,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return { error: 'Erreur réseau',e };
     }
+
   };
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string, role: UserRole = 'student') => {

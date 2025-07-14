@@ -35,7 +35,14 @@ export const CreateNoteDialog = ({ open, onOpenChange, projectId }: CreateNoteDi
           author_id: profile?.id || '',
         }),
       });
-      if (!res.ok) throw new Error('Erreur lors de la création de la note');
+      if (!res.ok) {
+        let msg = 'Erreur lors de la création de la note';
+        try {
+          const data = await res.json();
+          if (data && data.error) msg = data.error;
+        } catch {}
+        throw new Error(msg);
+      }
       toast({
         title: "Note créée",
         description: "La note a été créée avec succès.",
@@ -47,7 +54,7 @@ export const CreateNoteDialog = ({ open, onOpenChange, projectId }: CreateNoteDi
       console.error('Error creating note:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de créer la note",
+        description: error instanceof Error ? error.message : "Impossible de créer la note",
         variant: "destructive",
       });
     } finally {

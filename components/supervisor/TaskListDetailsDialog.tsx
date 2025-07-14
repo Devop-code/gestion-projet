@@ -64,6 +64,7 @@ export const TaskListDetailsDialog = ({ open, onOpenChange, taskList, onCreateTa
             </Button>
           </DialogTitle>
           <DialogDescription>{taskList.description}</DialogDescription>
+          
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex items-center justify-between">

@@ -73,13 +73,6 @@ export default function HomePage() {
               Gestion complète des projets et utilisateurs
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href="/auth">
-              <Button className="w-full">
-                Accéder au tableau de bord Admin
-              </Button>
-            </Link>
-          </CardContent>
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow">
