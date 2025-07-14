@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
@@ -27,23 +26,29 @@ export const CreateReportDialog = ({ open, onOpenChange, projectId }: CreateRepo
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('session_reports')
-        .insert({
+      const res = await fetch('/api/sessionreports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title,
           content,
           session_date: sessionDate,
           project_id: projectId,
           author_id: profile?.id || '',
-        });
-
-      if (error) throw error;
-
+        }),
+      });
+      if (!res.ok) {
+        let msg = 'Erreur lors de la création du rapport';
+        try {
+          const data = await res.json();
+          if (data && data.error) msg = data.error;
+        } catch {}
+        throw new Error(msg);
+      }
       toast({
         title: "Rapport créé",
         description: "Le rapport de séance a été créé avec succès.",
       });
-
       setTitle('');
       setContent('');
       setSessionDate('');
@@ -52,7 +57,7 @@ export const CreateReportDialog = ({ open, onOpenChange, projectId }: CreateRepo
       console.error('Error creating report:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de créer le rapport",
+        description: error instanceof Error ? error.message : "Impossible de créer le rapport",
         variant: "destructive",
       });
     } finally {

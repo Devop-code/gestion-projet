@@ -1,8 +1,8 @@
 
 import { useAuth } from '@/hooks/useAuth';
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { StudentDashboard } from '@/components/student/StudentDashboard';
-import { SupervisorDashboard } from '@/components/supervisor/SupervisorDashboard';
+import { AdminDashboard } from '@/app/admin/page';
+import { StudentDashboard } from '@/app/student/page';
+import { SupervisorDashboard } from '@/app/supervisor/page';
 
 export const Dashboard = () => {
   const { profile } = useAuth();

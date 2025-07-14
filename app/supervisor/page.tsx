@@ -1,100 +1,124 @@
-import { useState } from 'react';
+"use client"
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, FileText, CheckSquare, Users, Clock, Edit } from 'lucide-react';
-import { CreateTaskListDialog } from './CreateTaskListDialog';
-import { CreateTaskDialog } from './CreateTaskDialog';
-import { TaskListDetailsDialog } from './TaskListDetailsDialog';
-import { CreateReportDialog } from './CreateReportDialog';
-import { ReportDetailsDialog } from './ReportDetailsDialog';
+import { CreateTaskListDialog } from '../../components/supervisor/CreateTaskListDialog';
+import { CreateTaskDialog } from '../../components/supervisor/CreateTaskDialog';
+import { TaskListDetailsDialog } from '../../components/supervisor/TaskListDetailsDialog';
+import { CreateReportDialog } from '../../components/supervisor/CreateReportDialog';
+import { ReportDetailsDialog } from '../../components/supervisor/ReportDetailsDialog';
+import { useAuth } from '@/hooks/useAuth';
+import type { Report as DialogReport } from '../../components/supervisor/ReportDetailsDialog';
 
-// Données fictives
-const mockProjects = [
-  {
-    id: '1',
-    title: 'Application Web de Gestion Scolaire',
-    type: 'group_project',
-    students: ['Alice Martin', 'Bob Dupont', 'Clara Rousseau'],
-    progress: 65,
-    lastUpdate: '2024-07-01'
-  },
-  {
-    id: '2',
-    title: 'Rapport de Stage - Développement Mobile',
-    type: 'internship_report',
-    students: ['David Leclerc'],
-    progress: 40,
-    lastUpdate: '2024-06-28'
-  },
-  {
-    id: '3',
-    title: 'Système de Recommandation IA',
-    type: 'group_project',
-    students: ['Emma Bernard', 'François Petit'],
-    progress: 80,
-    lastUpdate: '2024-07-02'
-  }
-];
+interface Project {
+  id: string;
+  title: string;
+  type: string;
+  members: { student: { first_name: string; last_name: string } }[];
+  progress?: number;
+}
 
-const mockReports = [
-  {
-    id: '1',
-    title: 'Rapport Hebdomadaire - Semaine 1',
-    project: 'Application Web de Gestion Scolaire',
-    student: 'Alice Martin',
-    date: '2024-06-30',
-    status: 'pending'
-  },
-  {
-    id: '2',
-    title: 'Rapport de Progress - Module Auth',
-    project: 'Système de Recommandation IA',
-    student: 'Emma Bernard',
-    date: '2024-07-01',
-    status: 'pending'
-  }
-];
+interface Report {
+  id: string;
+  title: string;
+  content: string;
+  project?: { title: string };
+  author?: { first_name: string; last_name: string };
+  is_validated?: boolean;
+  createdAt?: string;
+  session_date?: string;
+  status?: string;
+}
 
-// Données fictives pour les rapports créés
-const mockCreatedReports = [
-  {
-    id: '1',
-    title: 'Évaluation mi-parcours - Alice',
-    type: 'evaluation',
-    project: 'Application Web de Gestion Scolaire',
-    student: 'Alice Martin',
-    content: 'Alice montre de très bons progrès sur le projet. Son travail sur le module d\'authentification est exemplaire. Points à améliorer : documentation du code et tests unitaires.',
-    date: '2024-07-01',
-    status: 'sent'
-  },
-  {
-    id: '2',
-    title: 'Suivi hebdomadaire - Emma',
-    type: 'progress',
-    project: 'Système de Recommandation IA',
-    student: 'Emma Bernard',
-    content: 'Bon avancement sur l\'algorithme de recommandation. Emma a bien compris les concepts de machine learning appliqués. Prochaine étape : optimisation des performances.',
-    date: '2024-06-30',
-    status: 'draft'
-  }
-];
+interface TaskList {
+  id: string;
+  title: string;
+  project?: { id: string; title: string };
+  tasks?: { status: string }[];
+}
+
+// Type pour le report tel que reçu du backend
+type ReportBackend = {
+  id: string;
+  title: string;
+  type?: string;
+  project?: { title?: string };
+  author?: { first_name?: string; last_name?: string };
+  content: string;
+  createdAt?: string;
+  session_date?: string;
+  status?: string;
+};
+
+// Utilitaire pour transformer un report backend en report frontend pour le dialog
+function toDialogReport(report: ReportBackend): DialogReport {
+  return {
+    id: report.id,
+    title: report.title,
+    type: report.type || '',
+    project: report.project?.title || '',
+    student: report.author ? `${report.author.first_name} ${report.author.last_name}` : '',
+    content: report.content,
+    date: report.session_date || report.createdAt || '',
+    status: report.status || '',
+  };
+}
 
 export const SupervisorDashboard = () => {
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [reports, setReports] = useState<Report[]>([]); // à valider
+  const [createdReports, setCreatedReports] = useState<Report[]>([]); // créés par le superviseur
+  const [taskLists, setTaskLists] = useState<TaskList[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [createTaskListOpen, setCreateTaskListOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [taskListDetailsOpen, setTaskListDetailsOpen] = useState(false);
   const [createReportOpen, setCreateReportOpen] = useState(false);
   const [reportDetailsOpen, setReportDetailsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState('');
-  const [selectedTaskList, setSelectedTaskList] = useState(null);
-  const [selectedReport, setSelectedReport] = useState(null);
+  const [selectedTaskList, setSelectedTaskList] = useState<TaskList | null>(null);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoading(true);
+
+    // Charger les projets supervisés
+    fetch(`/api/projects?supervisor_id=${user.id}`)
+      .then(res => res.json())
+      .then((data: Project[]) => {
+        setProjects(data);
+
+        // Charger toutes les listes de tâches des projets supervisés
+        const projectIds = new Set(data.map(p => p.id));
+        fetch(`/api/tasklists`)
+          .then(res => res.json())
+          .then((taskListsData: TaskList[]) => {
+            setTaskLists(taskListsData.filter(tl => tl.project && projectIds.has(tl.project.id)));
+          })
+          .finally(() => setLoading(false));
+      });
+
+    // Charger les rapports à valider (is_validated: false)
+    fetch(`/api/sessionreports?validated_by=${user.id}`)
+      .then(res => res.json())
+      .then((data: Report[]) => setReports(data.filter(r => !r.is_validated)));
+
+    // Charger les rapports créés par le superviseur
+    fetch(`/api/sessionreports?author_id=${user.id}`)
+      .then(res => res.json())
+      .then((data: Report[]) => setCreatedReports(data));
+  }, [user]);
 
   const handleCreateTaskList = (projectId: string) => {
     setSelectedProject(projectId);
     setCreateTaskListOpen(true);
   };
 
-  const handleTaskListClick = (taskList: any) => {
+  const handleTaskListClick = (taskList: TaskList) => {
     setSelectedTaskList(taskList);
     setTaskListDetailsOpen(true);
   };
@@ -108,7 +132,7 @@ export const SupervisorDashboard = () => {
     setCreateReportOpen(true);
   };
 
-  const handleReportClick = (report: any) => {
+  const handleReportClick = (report: Report) => {
     setSelectedReport(report);
     setReportDetailsOpen(true);
   };
@@ -122,6 +146,10 @@ export const SupervisorDashboard = () => {
     if (progress >= 50) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Chargement...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -140,7 +168,7 @@ export const SupervisorDashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockProjects.length}</div>
+            <div className="text-2xl font-bold">{projects.length}</div>
             <p className="text-xs text-muted-foreground">
               Projets actifs
             </p>
@@ -153,7 +181,7 @@ export const SupervisorDashboard = () => {
             <CheckSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{taskLists.length}</div>
             <p className="text-xs text-muted-foreground">
               Créées
             </p>
@@ -166,7 +194,7 @@ export const SupervisorDashboard = () => {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockReports.length}</div>
+            <div className="text-2xl font-bold">{reports.length}</div>
             <p className="text-xs text-muted-foreground">
               À valider
             </p>
@@ -179,7 +207,7 @@ export const SupervisorDashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{[...new Set(projects.flatMap(p => p.members.map(m => m.student ? m.student.first_name + ' ' + m.student.last_name : '-')))].length}</div>
             <p className="text-xs text-muted-foreground">
               Sous supervision
             </p>
@@ -196,7 +224,7 @@ export const SupervisorDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockProjects.map((project) => (
+            {projects.map((project) => (
               <div key={project.id} className="border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold">{project.title}</h3>
@@ -205,13 +233,13 @@ export const SupervisorDashboard = () => {
                   </span>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Étudiants: {project.students.join(', ')}
+                  Étudiants: {project.members.map(m => m.student ? m.student.first_name + ' ' + m.student.last_name : '-').join(', ')}
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <span className="text-sm">Progrès:</span>
-                    <span className={`font-semibold ${getProgressColor(project.progress)}`}>
-                      {project.progress}%
+                    <span className={`font-semibold ${getProgressColor(project.progress || 0)}`}>
+                      {project.progress || '-'}%
                     </span>
                   </div>
                   <div className="flex space-x-2">
@@ -242,7 +270,7 @@ export const SupervisorDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockCreatedReports.map((report) => (
+            {createdReports.map((report) => (
               <div 
                 key={report.id} 
                 className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -256,14 +284,14 @@ export const SupervisorDashboard = () => {
                   </div>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Étudiant: {report.student}
+                  Étudiant: {report.author ? report.author.first_name + ' ' + report.author.last_name : '-'}
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="text-sm">
-                    Projet: <span className="font-medium">{report.project}</span>
+                    Projet: <span className="font-medium">{report.project ? report.project.title : '-'}</span>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {new Date(report.date).toLocaleDateString('fr-FR')}
+                    {report.createdAt ? new Date(report.createdAt).toLocaleDateString('fr-FR') : '-'}
                   </div>
                 </div>
               </div>
@@ -281,7 +309,7 @@ export const SupervisorDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockReports.map((report) => (
+            {reports.map((report) => (
               <div 
                 key={report.id} 
                 className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -295,11 +323,11 @@ export const SupervisorDashboard = () => {
                   </div>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Projet: {report.project}
+                  Projet: {report.project ? report.project.title : '-'}
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="text-sm">
-                    Par: <span className="font-medium">{report.student}</span>
+                    Par: <span className="font-medium">{report.author ? report.author.first_name + ' ' + report.author.last_name : '-'}</span>
                   </div>
                   <div className="flex space-x-2">
                     <Button size="sm" variant="outline">
@@ -316,7 +344,7 @@ export const SupervisorDashboard = () => {
         </Card>
       </div>
 
-      {/* Listes de tâches simulées */}
+      {/* Listes de tâches dynamiques */}
       <Card>
         <CardHeader>
           <CardTitle>Listes de tâches</CardTitle>
@@ -326,29 +354,29 @@ export const SupervisorDashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { id: '1', title: 'Sprint 1 - Authentification', project: 'Application Web de Gestion Scolaire', tasksCount: 5, completedCount: 2 },
-              { id: '2', title: 'Phase de développement', project: 'Système de Recommandation IA', tasksCount: 8, completedCount: 6 },
-              { id: '3', title: 'Tests et validation', project: 'Application Web de Gestion Scolaire', tasksCount: 3, completedCount: 1 }
-            ].map((taskList) => (
-              <div 
-                key={taskList.id} 
-                className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={() => handleTaskListClick(taskList)}
-              >
-                <h3 className="font-semibold mb-2">{taskList.title}</h3>
-                <p className="text-sm text-gray-600 mb-3">{taskList.project}</p>
-                <div className="flex justify-between items-center text-sm">
-                  <span>{taskList.completedCount}/{taskList.tasksCount} tâches terminées</span>
-                  <div className="w-16 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${(taskList.completedCount / taskList.tasksCount) * 100}%` }}
-                    ></div>
+            {taskLists.map((taskList) => {
+              const completedCount = taskList.tasks ? taskList.tasks.filter(t => t.status === 'completed').length : 0;
+              const tasksCount = taskList.tasks ? taskList.tasks.length : 0;
+              return (
+                <div 
+                  key={taskList.id} 
+                  className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => handleTaskListClick(taskList)}
+                >
+                  <h3 className="font-semibold mb-2">{taskList.title}</h3>
+                  <p className="text-sm text-gray-600 mb-3">{taskList.project ? taskList.project.title : '-'}</p>
+                  <div className="flex justify-between items-center text-sm">
+                    <span>{completedCount}/{tasksCount} tâches terminées</span>
+                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full" 
+                        style={{ width: `${tasksCount > 0 ? (completedCount / tasksCount) * 100 : 0}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -363,7 +391,7 @@ export const SupervisorDashboard = () => {
       <CreateTaskDialog
         open={createTaskOpen}
         onOpenChange={setCreateTaskOpen}
-        taskListId="1"
+        taskListId={selectedTaskList?.id || ''}
       />
       
       <TaskListDetailsDialog
@@ -381,8 +409,9 @@ export const SupervisorDashboard = () => {
       <ReportDetailsDialog
         open={reportDetailsOpen}
         onOpenChange={setReportDetailsOpen}
-        report={selectedReport}
+        report={selectedReport ? toDialogReport(selectedReport as ReportBackend) : null}
       />
     </div>
   );
 };
+export default SupervisorDashboard;

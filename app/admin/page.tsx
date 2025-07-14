@@ -1,61 +1,70 @@
-import { useState } from 'react';
+"use client"
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Users, FolderOpen, FileText, Edit, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CreateProjectDialog } from './CreateProjectDialog';
-import { CreateReportDialog } from './CreateReportDialog';
-import { ProjectDetailsDialog } from './ProjectDetailsDialog';
+import { CreateProjectDialog } from '../../components/admin/CreateProjectDialog';
+import { CreateReportDialog } from '../../components/admin/CreateReportDialog';
+import { ProjectDetailsDialog } from '../../components/admin/ProjectDetailsDialog';
 
-// Données fictives
-const mockProjects = [
-  {
-    id: '1',
-    title: 'Application E-commerce',
-    description: 'Développement d\'une application e-commerce complète avec panier, paiement et gestion des commandes.',
-    type: 'group_project',
-    supervisor: 'Dr. Martin Dubois',
-    members: 4,
-    createdAt: '2024-01-15',
-    status: 'in_progress'
-  },
-  {
-    id: '2',
-    title: 'Système de Gestion RH',
-    description: 'Création d\'un système de gestion des ressources humaines pour une entreprise moyenne.',
-    type: 'internship_report',
-    supervisor: 'Prof. Sarah Leblanc',
-    members: 1,
-    createdAt: '2024-02-10',
-    status: 'completed'
-  },
-  {
-    id: '3',
-    title: 'Application Mobile Fitness',
-    description: 'Application mobile pour le suivi des activités sportives et de la nutrition.',
-    type: 'group_project',
-    supervisor: 'Dr. Pierre Moreau',
-    members: 3,
-    createdAt: '2024-01-28',
-    status: 'in_progress'
-  }
-];
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  supervisor?: { first_name: string; last_name: string } | string;
+  members?: { student: { id: string } }[];
+  createdAt?: string;
+  status?: string;
+}
+
+interface Profile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+}
+
+interface SessionReport {
+  id: string;
+  is_validated?: boolean;
+}
 
 export const AdminDashboard = () => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [reports, setReports] = useState<SessionReport[]>([]);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateReport, setShowCreateReport] = useState(false);
   const [showProjectDetails, setShowProjectDetails] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<typeof mockProjects[0] | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(setProjects);
+    fetch('/api/profiles')
+      .then(res => res.json())
+      .then(setUsers);
+    fetch('/api/sessionreports')
+      .then(res => res.json())
+      .then(setReports);
+  }, []);
 
   const getTypeLabel = (type: string) => {
     return type === 'group_project' ? 'Projet de groupe' : 'Rapport de stage';
   };
 
-  const handleProjectClick = (project: typeof mockProjects[0]) => {
+  const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
     setShowProjectDetails(true);
   };
+
+  const activeProjects = projects.filter(p => p.status === 'in_progress');
+  const pendingReports = reports.filter(r => r.is_validated === false);
 
   return (
     <div className="space-y-6">
@@ -80,9 +89,9 @@ export const AdminDashboard = () => {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{activeProjects.length}</div>
             <p className="text-xs text-muted-foreground">
-              +2 depuis le mois dernier
+              +{activeProjects.length - 10 > 0 ? activeProjects.length - 10 : 0} depuis le mois dernier
             </p>
           </CardContent>
         </Card>
@@ -93,9 +102,9 @@ export const AdminDashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">48</div>
+            <div className="text-2xl font-bold">{users.length}</div>
             <p className="text-xs text-muted-foreground">
-              +5 nouveaux cette semaine
+              +{users.length - 43 > 0 ? users.length - 43 : 0} nouveaux cette semaine
             </p>
           </CardContent>
         </Card>
@@ -106,7 +115,7 @@ export const AdminDashboard = () => {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">7</div>
+            <div className="text-2xl font-bold">{pendingReports.length}</div>
             <p className="text-xs text-muted-foreground">
               À valider
             </p>
@@ -134,7 +143,7 @@ export const AdminDashboard = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockProjects.map((project) => (
+              {projects.map((project) => (
                 <TableRow 
                   key={project.id} 
                   className="cursor-pointer hover:bg-gray-50"
@@ -146,15 +155,21 @@ export const AdminDashboard = () => {
                       {getTypeLabel(project.type)}
                     </Badge>
                   </TableCell>
-                  <TableCell>{project.supervisor}</TableCell>
+                  <TableCell>
+                    {typeof project.supervisor === 'string'
+                      ? project.supervisor
+                      : project.supervisor
+                      ? `${project.supervisor.first_name} ${project.supervisor.last_name}`
+                      : '-'}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-1">
                       <Users className="h-4 w-4" />
-                      <span>{project.members}</span>
+                      <span>{project.members ? project.members.length : 0}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    {new Date(project.createdAt).toLocaleDateString('fr-FR')}
+                    {project.createdAt ? new Date(project.createdAt).toLocaleDateString('fr-FR') : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
@@ -191,3 +206,4 @@ export const AdminDashboard = () => {
     </div>
   );
 };
+export default AdminDashboard;

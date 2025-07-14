@@ -1,11 +1,14 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
+import type { Profile } from '@/types/database';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -14,29 +17,85 @@ interface CreateTaskDialogProps {
 }
 
 export const CreateTaskDialog = ({ open, onOpenChange, taskListId }: CreateTaskDialogProps) => {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [assignedTo, setAssignedTo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState<Profile[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!taskListId) return;
+    setStudentsLoading(true);
+    // 1. Récupérer la taskList pour obtenir le project_id
+    fetch(`/api/tasklists/${taskListId}`)
+      .then(res => res.json())
+      .then((taskList) => {
+        const projectId = taskList.project_id || taskList.project?.id;
+        if (!projectId) {
+          setStudents([]);
+          setStudentsLoading(false);
+          return;
+        }
+        // 2. Récupérer les membres du projet
+        fetch(`/api/projectmembers?project_id=${projectId}`)
+          .then(res => res.json())
+          .then((members) => {
+            setStudents(
+              members
+                .map((m: { student?: Profile }) => m.student)
+                .filter((s: Profile | undefined): s is Profile => !!s)
+            );
+            setStudentsLoading(false);
+          });
+      });
+  }, [taskListId, open]);
+
+  // Réinitialiser assignedTo si la valeur sélectionnée n'est plus dans la liste
+  useEffect(() => {
+    if (assignedTo && !students.find(s => s.id === assignedTo)) {
+      setAssignedTo('');
+    }
+  }, [students]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    // Simulation de création de tâche
-    console.log('Creating task:', { title, description, priority, assignedTo, taskListId });
-    
-    // Simuler un délai
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          priority,
+          status: 'pending',
+          task_list_id: taskListId,
+          created_by: user?.id || '',
+          assigned_to: assignedTo || null,
+        }),
+      });
+      if (!res.ok) throw new Error('Erreur lors de la création');
+      toast({
+        title: 'Tâche créée',
+        description: 'La tâche a été créée avec succès.',
+      });
       setTitle('');
       setDescription('');
       setPriority('medium');
       setAssignedTo('');
       setLoading(false);
       onOpenChange(false);
-      alert('Tâche créée avec succès !');
-    }, 1000);
+    } catch {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de créer la tâche',
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
   };
 
   return (
@@ -85,24 +144,26 @@ export const CreateTaskDialog = ({ open, onOpenChange, taskListId }: CreateTaskD
 
           <div className="space-y-2">
             <Label htmlFor="assignedTo">Assigné à</Label>
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <Select value={assignedTo} onValueChange={setAssignedTo} disabled={students.length === 0 || studentsLoading}>
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un étudiant" />
+                <SelectValue placeholder={studentsLoading ? 'Chargement...' : 'Sélectionner un étudiant'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="alice">Alice Martin</SelectItem>
-                <SelectItem value="bob">Bob Dupont</SelectItem>
-                <SelectItem value="clara">Clara Rousseau</SelectItem>
-                <SelectItem value="david">David Leclerc</SelectItem>
+                {students.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {students.length === 0 && !studentsLoading && (
+              <div className="text-sm text-gray-500 mt-2">Aucun étudiant disponible pour ce projet.</div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || students.length === 0 || studentsLoading}>
               {loading ? 'Création...' : 'Créer'}
             </Button>
           </div>

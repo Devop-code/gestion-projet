@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
@@ -26,22 +25,21 @@ export const CreateNoteDialog = ({ open, onOpenChange, projectId }: CreateNoteDi
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('notes')
-        .insert({
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title,
           content,
           project_id: projectId,
           author_id: profile?.id || '',
-        });
-
-      if (error) throw error;
-
+        }),
+      });
+      if (!res.ok) throw new Error('Erreur lors de la création de la note');
       toast({
         title: "Note créée",
         description: "La note a été créée avec succès.",
       });
-
       setTitle('');
       setContent('');
       onOpenChange(false);

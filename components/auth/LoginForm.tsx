@@ -6,26 +6,33 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, user } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password}),
-      });
-
-    
-   
-    
+    const { error } = await signIn(email, password);
     setLoading(false);
+    if (error) {
+      toast({
+        title: "Erreur de connexion",
+        description: error,
+        variant: 'destructive',
+      });
+    } else {
+      // Redirection selon le rôle
+      if (user?.role === "admin") router.push("/admin");
+      else if (user?.role === "supervisor") router.push("/supervisor");
+      else if (user?.role === "student") router.push("/student");
+      else router.push("/");
+    }
   };
 
   return (
@@ -33,7 +40,7 @@ export const LoginForm = () => {
       <CardHeader>
         <CardTitle>Connexion</CardTitle>
         <CardDescription>
-          Connectez-vous à votre compte pour accéder à l'application
+          Connectez-vous à votre compte pour accéder à l application
         </CardDescription>
       </CardHeader>
       <CardContent>

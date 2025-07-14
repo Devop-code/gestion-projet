@@ -1,11 +1,10 @@
-
+"use client"
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
@@ -16,7 +15,7 @@ interface CreateTaskListDialogProps {
 }
 
 export const CreateTaskListDialog = ({ open, onOpenChange, projectId }: CreateTaskListDialogProps) => {
-  const { profile } = useAuth();
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,16 +25,17 @@ export const CreateTaskListDialog = ({ open, onOpenChange, projectId }: CreateTa
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('task_lists')
-        .insert({
+      const res = await fetch('/api/tasklists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title,
           description,
           project_id: projectId,
-          created_by: profile?.id || '',
-        });
-
-      if (error) throw error;
+          created_by: user?.id || '',
+        }),
+      });
+      if (!res.ok) throw new Error('Erreur lors de la création');
 
       toast({
         title: "Liste de tâches créée",

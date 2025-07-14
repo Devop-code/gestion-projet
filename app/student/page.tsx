@@ -1,109 +1,98 @@
-import { useState } from 'react';
+"use client"
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, FileText, CheckSquare, StickyNote, Calendar, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { CreateNoteDialog } from './CreateNoteDialog';
-import { NoteDetailsDialog } from './NoteDetailsDialog';
-import { TaskDetailsDialog } from './TaskDetailsDialog';
-import { CreateReportDialog } from './CreateReportDialog';
-import { ReportDetailsDialog } from './ReportDetailsDialog';
+import { CreateNoteDialog } from '../../components/student/CreateNoteDialog';
+import { NoteDetailsDialog } from '../../components/student/NoteDetailsDialog';
+import { TaskDetailsDialog } from '../../components/student/TaskDetailsDialog';
+import { CreateReportDialog } from '../../components/student/CreateReportDialog';
+import { ReportDetailsDialog } from '../../components/student/ReportDetailsDialog';
+import { useAuth } from '@/hooks/useAuth';
 
-// Données fictives
-const mockProjects = [
-  {
-    id: '1',
-    title: 'Application Web de Gestion Scolaire',
-    type: 'group_project',
-    supervisor: 'Dr. Martin Dubois',
-    members: ['Alice Martin', 'Bob Dupont', 'Clara Rousseau'],
-    progress: 65,
-    nextDeadline: '2024-07-15'
-  },
-  {
-    id: '2',
-    title: 'Rapport de Stage - Développement Mobile',
-    type: 'internship_report',
-    supervisor: 'Prof. Sarah Leblanc',
-    members: ['Moi'],
-    progress: 40,
-    nextDeadline: '2024-07-20'
-  }
-];
+interface Project {
+  id: string;
+  title: string;
+  type: string;
+  supervisor?: { first_name: string; last_name: string } | null;
+}
 
-const mockTasks = [
-  {
-    id: '1',
-    title: 'Implémenter l\'authentification',
-    project: 'Application Web de Gestion Scolaire',
-    status: 'in_progress',
-    dueDate: '2024-07-10',
-    priority: 'high'
-  },
-  {
-    id: '2',
-    title: 'Rédiger la documentation API',
-    project: 'Application Web de Gestion Scolaire',
-    status: 'pending',
-    dueDate: '2024-07-12',
-    priority: 'medium'
-  },
-  {
-    id: '3',
-    title: 'Tests unitaires du module utilisateur',
-    project: 'Rapport de Stage - Développement Mobile',
-    status: 'completed',
-    dueDate: '2024-07-05',
-    priority: 'low'
-  }
-];
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: string;
+  priority: string;
+  taskList?: { project?: { title: string } };
+  project?: string; // pour compatibilité avec les dialogs
+}
 
-const mockNotes = [
-  {
-    id: '1',
-    title: 'Réunion équipe - 30 juin',
-    project: 'Application Web de Gestion Scolaire',
-    content: 'Discussion sur l\'architecture de l\'application...',
-    createdAt: '2024-06-30'
-  },
-  {
-    id: '2',
-    title: 'Idées pour l\'interface utilisateur',
-    project: 'Application Web de Gestion Scolaire',
-    content: 'Palette de couleurs, wireframes...',
-    createdAt: '2024-06-28'
-  }
-];
+interface Note {
+  id: string;
+  title: string;
+  content: string;
+  created_at?: string;
+  createdAt: string;
+  project?: { title: string } | string;
+}
 
-const mockReports = [
-  {
-    id: '1',
-    title: 'Rapport de séance - Semaine 1',
-    project: 'Application Web de Gestion Scolaire',
-    content: 'Durant cette première séance, nous avons défini l\'architecture générale de l\'application...',
-    sessionDate: '2024-07-01',
-    createdAt: '2024-07-01'
-  },
-  {
-    id: '2',
-    title: 'Rapport d\'avancement - Milestone 1',
-    project: 'Rapport de Stage - Développement Mobile',
-    content: 'Avancement sur le développement des fonctionnalités principales...',
-    sessionDate: '2024-06-28',
-    createdAt: '2024-06-28'
-  }
-];
+interface Report {
+  id: string;
+  title: string;
+  content: string;
+  session_date?: string;
+  sessionDate: string;
+  createdAt: string;
+  project?: { title: string } | string;
+}
 
 export const StudentDashboard = () => {
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [createNoteOpen, setCreateNoteOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState('');
   const [noteDetailsOpen, setNoteDetailsOpen] = useState(false);
-  const [selectedNote, setSelectedNote] = useState(null);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [taskDetailsOpen, setTaskDetailsOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [createReportOpen, setCreateReportOpen] = useState(false);
   const [reportDetailsOpen, setReportDetailsOpen] = useState(false);
-  const [selectedReport, setSelectedReport] = useState(null);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoading(true);
+    // Récupérer les projets où l'utilisateur est membre
+    fetch(`/api/projectmembers?student_id=${user.id}`)
+      .then(res => res.json())
+      .then(async (members) => {
+        const projectIds = members.map((m: { project_id: string }) => m.project_id);
+        // Charger les projets
+        const projectsRes = await fetch(`/api/projects`);
+        const allProjects = await projectsRes.json();
+        const filteredProjects = allProjects.filter((p: Project) => projectIds.includes(p.id));
+        setProjects(filteredProjects);
+      });
+    // Récupérer les tâches assignées à l'utilisateur
+    fetch(`/api/tasks?assigned_to=${user.id}`)
+      .then(res => res.json())
+      .then(setTasks);
+    // Récupérer les notes créées par l'utilisateur
+    fetch(`/api/notes?author_id=${user.id}`)
+      .then(res => res.json())
+      .then(setNotes);
+    // Récupérer les rapports créés par l'utilisateur
+    fetch(`/api/sessionreports?author_id=${user.id}`)
+      .then(res => res.json())
+      .then(setReports)
+      .finally(() => setLoading(false));
+  }, [user]);
 
   const handleCreateNote = (projectId: string) => {
     setSelectedProject(projectId);
@@ -115,17 +104,17 @@ export const StudentDashboard = () => {
     setCreateReportOpen(true);
   };
 
-  const handleNoteClick = (note: any) => {
+  const handleNoteClick = (note: Note) => {
     setSelectedNote(note);
     setNoteDetailsOpen(true);
   };
 
-  const handleTaskClick = (task: any) => {
+  const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setTaskDetailsOpen(true);
   };
 
-  const handleReportClick = (report: any) => {
+  const handleReportClick = (report: Report) => {
     setSelectedReport(report);
     setReportDetailsOpen(true);
   };
@@ -150,13 +139,17 @@ export const StudentDashboard = () => {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string | undefined) => {
     switch (priority) {
       case 'high': return 'text-red-600';
       case 'medium': return 'text-yellow-600';
       default: return 'text-green-600';
     }
   };
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500">Chargement...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -171,7 +164,7 @@ export const StudentDashboard = () => {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockProjects.length}</div>
+            <div className="text-2xl font-bold">{projects.length}</div>
             <p className="text-xs text-muted-foreground">
               Projets actifs
             </p>
@@ -185,7 +178,7 @@ export const StudentDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockTasks.filter(t => t.status !== 'completed').length}
+              {tasks.filter(t => t.status !== 'completed').length}
             </div>
             <p className="text-xs text-muted-foreground">
               En cours
@@ -199,7 +192,7 @@ export const StudentDashboard = () => {
             <StickyNote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockNotes.length}</div>
+            <div className="text-2xl font-bold">{notes.length}</div>
             <p className="text-xs text-muted-foreground">
               Créées
             </p>
@@ -212,7 +205,7 @@ export const StudentDashboard = () => {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length}</div>
             <p className="text-xs text-muted-foreground">
               Cette semaine
             </p>
@@ -229,7 +222,7 @@ export const StudentDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockProjects.map((project) => (
+            {projects.map((project) => (
               <div key={project.id} className="border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold">{project.title}</h3>
@@ -238,15 +231,16 @@ export const StudentDashboard = () => {
                   </Badge>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Encadreur: {project.supervisor}
+                  Encadreur: {project.supervisor ? (project.supervisor.first_name + ' ' + project.supervisor.last_name) : 'Non assigné'}
                 </div>
                 <div className="flex justify-between items-center mb-3">
                   <div className="text-sm">
-                    Progrès: <span className="font-medium">{project.progress}%</span>
+                    Progrès: <span className="font-medium">-</span>
                   </div>
                   <div className="flex items-center text-sm text-orange-600">
                     <Calendar className="h-3 w-3 mr-1" />
-                    {new Date(project.nextDeadline).toLocaleDateString('fr-FR')}
+                    {/* À remplacer par la prochaine échéance réelle si dispo */}
+                    -
                   </div>
                 </div>
                 <div className="flex space-x-2">
@@ -280,7 +274,7 @@ export const StudentDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockTasks.map((task) => (
+            {tasks.map((task) => (
               <div 
                 key={task.id} 
                 className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -293,13 +287,13 @@ export const StudentDashboard = () => {
                   </span>
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  {task.project}
+                  {task.taskList && task.taskList.project ? (typeof task.taskList.project === 'string' ? task.taskList.project : task.taskList.project.title) : '-'}
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <span className="text-xs">Échéance:</span>
                     <span className="text-xs font-medium">
-                      {new Date(task.dueDate).toLocaleDateString('fr-FR')}
+                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString('fr-FR') : '-'}
                     </span>
                   </div>
                   <span className={`text-xs font-medium ${getPriorityColor(task.priority)}`}>
@@ -322,7 +316,7 @@ export const StudentDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4">
-              {mockNotes.map((note) => (
+              {notes.map((note) => (
                 <div 
                   key={note.id} 
                   className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -333,8 +327,8 @@ export const StudentDashboard = () => {
                     {note.content}
                   </p>
                   <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>{note.project}</span>
-                    <span>{new Date(note.createdAt).toLocaleDateString('fr-FR')}</span>
+                    <span>{typeof note.project === 'string' ? note.project : note.project ? note.project.title : '-'}</span>
+                    <span>{note.created_at ? new Date(note.created_at).toLocaleDateString('fr-FR') : '-'}</span>
                   </div>
                 </div>
               ))}
@@ -351,7 +345,7 @@ export const StudentDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4">
-              {mockReports.map((report) => (
+              {reports.map((report) => (
                 <div 
                   key={report.id} 
                   className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -362,8 +356,8 @@ export const StudentDashboard = () => {
                     {report.content}
                   </p>
                   <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>{report.project}</span>
-                    <span>Séance: {new Date(report.sessionDate).toLocaleDateString('fr-FR')}</span>
+                    <span>{typeof report.project === 'string' ? report.project : report.project ? report.project.title : '-'}</span>
+                    <span>Séance: {report.session_date ? new Date(report.session_date).toLocaleDateString('fr-FR') : '-'}</span>
                   </div>
                 </div>
               ))}
@@ -382,13 +376,23 @@ export const StudentDashboard = () => {
       <NoteDetailsDialog
         open={noteDetailsOpen}
         onOpenChange={setNoteDetailsOpen}
-        note={selectedNote}
+        note={selectedNote ? { ...selectedNote, project: typeof selectedNote.project === 'string' ? selectedNote.project : selectedNote.project?.title || '' } : null}
       />
       
       <TaskDetailsDialog
         open={taskDetailsOpen}
         onOpenChange={setTaskDetailsOpen}
-        task={selectedTask}
+        task={
+          selectedTask
+            ? {
+                ...selectedTask,
+                project:
+                  typeof selectedTask.project === 'string'
+                    ? selectedTask.project
+                    : selectedTask.project?.title || '',
+              }
+            : { id: '', title: '', status: '', dueDate: '', priority: '', project: '' }
+        }
       />
 
       <CreateReportDialog
@@ -400,8 +404,10 @@ export const StudentDashboard = () => {
       <ReportDetailsDialog
         open={reportDetailsOpen}
         onOpenChange={setReportDetailsOpen}
-        report={selectedReport}
+        report={selectedReport ? { ...selectedReport, project: typeof selectedReport.project === 'string' ? selectedReport.project : selectedReport.project?.title || '' } : null}
       />
     </div>
   );
 };
+
+export default StudentDashboard;

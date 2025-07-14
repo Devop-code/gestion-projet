@@ -1,11 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
 interface CreateReportDialogProps {
   open: boolean;
@@ -18,23 +19,56 @@ export const CreateReportDialog = ({ open, onOpenChange }: CreateReportDialogPro
   const [project, setProject] = useState('');
   const [author, setAuthor] = useState('');
   const [loading, setLoading] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/projects')
+      .then(res => res.json())
+      .then(setProjects);
+  }, []);
+
+  useEffect(() => {
+    if (!project) return;
+    fetch(`/api/projectmembers?project_id=${project}`)
+      .then(res => res.json())
+      .then((members) => setStudents(members.map((m: any) => m.student)));
+  }, [project]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    // Simulation de la création du rapport
-    setTimeout(() => {
-      console.log('Rapport créé:', { title, content, project, author });
-      
-      // Reset form
+    try {
+      const res = await fetch('/api/sessionreports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          content,
+          project_id: project,
+          author_id: author,
+          session_date: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) throw new Error('Erreur lors de la création');
+      toast({
+        title: 'Rapport créé',
+        description: 'Le rapport a été créé avec succès.',
+      });
       setTitle('');
       setContent('');
       setProject('');
       setAuthor('');
       setLoading(false);
       onOpenChange(false);
-    }, 1000);
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de créer le rapport',
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,9 +98,9 @@ export const CreateReportDialog = ({ open, onOpenChange }: CreateReportDialogPro
                 <SelectValue placeholder="Sélectionner un projet" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ecommerce">Application E-commerce</SelectItem>
-                <SelectItem value="rh">Système de Gestion RH</SelectItem>
-                <SelectItem value="fitness">Application Mobile Fitness</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -78,9 +112,9 @@ export const CreateReportDialog = ({ open, onOpenChange }: CreateReportDialogPro
                 <SelectValue placeholder="Sélectionner un auteur" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="student1">Marie Dupont</SelectItem>
-                <SelectItem value="student2">Jean Martin</SelectItem>
-                <SelectItem value="student3">Sophie Leblanc</SelectItem>
+                {students.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

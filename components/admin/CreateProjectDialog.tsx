@@ -1,15 +1,22 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+interface Supervisor {
+  id: string;
+  first_name: string;
+  last_name: string;
 }
 
 export const CreateProjectDialog = ({ open, onOpenChange }: CreateProjectDialogProps) => {
@@ -18,23 +25,48 @@ export const CreateProjectDialog = ({ open, onOpenChange }: CreateProjectDialogP
   const [type, setType] = useState<'group_project' | 'internship_report'>('group_project');
   const [supervisor, setSupervisor] = useState('');
   const [loading, setLoading] = useState(false);
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+
+  useEffect(() => {
+    fetch('/api/profiles')
+      .then(res => res.json())
+      .then((data: Supervisor[]) => setSupervisors(data.filter(s => s.role === 'supervisor')));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    // Simulation de la création du projet
-    setTimeout(() => {
-      console.log('Projet créé:', { title, description, type, supervisor });
-      
-      // Reset form
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          type,
+          supervisor_id: supervisor || null,
+          created_by: supervisor || null, // à adapter si besoin
+        }),
+      });
+      if (!res.ok) throw new Error('Erreur lors de la création');
+      toast({
+        title: 'Projet créé',
+        description: 'Le projet a été créé avec succès.',
+      });
       setTitle('');
       setDescription('');
       setType('group_project');
       setSupervisor('');
       setLoading(false);
       onOpenChange(false);
-    }, 1000);
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de créer le projet',
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
   };
 
   return (
@@ -87,9 +119,9 @@ export const CreateProjectDialog = ({ open, onOpenChange }: CreateProjectDialogP
                 <SelectValue placeholder="Sélectionner un encadreur" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="dr-martin">Dr. Martin Dubois</SelectItem>
-                <SelectItem value="prof-sarah">Prof. Sarah Leblanc</SelectItem>
-                <SelectItem value="dr-pierre">Dr. Pierre Moreau</SelectItem>
+                {supervisors.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.first_name} {s.last_name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Edit, Trash2, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { Project, Profile } from '@/types/database';
 
-interface ProjectWithDetails extends Project {
-  supervisor: Profile | null;
-  project_members: {
-    student: Profile;
-  }[];
+interface ProjectWithDetails {
+  id: string;
+  title: string;
+  type: string;
+  supervisor?: { first_name: string; last_name: string } | null;
+  members?: { student: { first_name: string; last_name: string } }[];
+  created_at: string;
 }
 
 export const ProjectList = () => {
@@ -24,18 +24,9 @@ export const ProjectList = () => {
 
   const fetchProjects = async () => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select(`
-          *,
-          supervisor:supervisor_id(first_name, last_name),
-          project_members(
-            student:student_id(first_name, last_name)
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const res = await fetch('/api/projects');
+      if (!res.ok) throw new Error('Erreur lors du chargement');
+      const data = await res.json();
       setProjects(data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -80,19 +71,18 @@ export const ProjectList = () => {
                 </Badge>
               </TableCell>
               <TableCell>
-                {project.supervisor ? 
-                  `${project.supervisor.first_name} ${project.supervisor.last_name}` : 
-                  'Non assigné'
-                }
+                {project.supervisor
+                  ? `${project.supervisor.first_name} ${project.supervisor.last_name}`
+                  : 'Non assigné'}
               </TableCell>
               <TableCell>
                 <div className="flex items-center space-x-1">
                   <Users className="h-4 w-4" />
-                  <span>{project.project_members.length}</span>
+                  <span>{project.members ? project.members.length : 0}</span>
                 </div>
               </TableCell>
               <TableCell>
-                {new Date(project.created_at).toLocaleDateString('fr-FR')}
+                {project.created_at ? new Date(project.created_at).toLocaleDateString('fr-FR') : '-'}
               </TableCell>
               <TableCell>
                 <div className="flex space-x-2">
