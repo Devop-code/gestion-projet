@@ -67,16 +67,6 @@ export default function HomePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="text-center">
-            <Shield className="h-12 w-12 mx-auto mb-4 text-red-600" />
-            <CardTitle>Administrateur</CardTitle>
-            <CardDescription>
-              Gestion complète des projets et utilisateurs
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="text-center">
             <UserCheck className="h-12 w-12 mx-auto mb-4 text-blue-600" />
             <CardTitle>Encadreur</CardTitle>
             <CardDescription>

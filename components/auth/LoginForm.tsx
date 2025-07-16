@@ -31,7 +31,7 @@ export const LoginForm = () => {
       if (user?.role === "admin") router.push("/admin");
       else if (user?.role === "supervisor") router.push("/supervisor");
       else if (user?.role === "student") router.push("/student");
-      else router.push("/");
+      else router.push(`/${user?.role}`);
     }
   };
 

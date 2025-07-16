@@ -130,7 +130,9 @@ export const StudentDashboard = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-
+ const Logout = () =>{
+  useAuth().signOut();
+ }
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'completed': return 'Terminé';
@@ -152,10 +154,12 @@ export const StudentDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 m-auto">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Tableau de bord Étudiant</h2>
+        <Button onClick={()=>{Logout()}}>Se Deconnecter</Button>
       </div>
+      
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
